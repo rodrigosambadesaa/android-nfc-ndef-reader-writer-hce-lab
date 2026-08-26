@@ -1,0 +1,14 @@
+package dev.rodrigo.nfclab;
+
+import android.nfc.*; import android.nfc.tech.Ndef; import android.os.Bundle; import android.widget.*; import androidx.activity.ComponentActivity; import java.nio.charset.StandardCharsets; import java.util.Arrays;
+
+public class MainActivity extends ComponentActivity implements NfcAdapter.ReaderCallback {
+ private TextView status; private NfcAdapter adapter; private volatile Tag currentTag;
+ @Override protected void onCreate(Bundle b){super.onCreate(b);setContentView(R.layout.activity_main);status=findViewById(R.id.status);adapter=NfcAdapter.getDefaultAdapter(this);findViewById(R.id.write).setOnClickListener(v->writeDemo());status.setText(adapter==null?"NFC unavailable":"Bring an NDEF tag close to the device");}
+ @Override protected void onResume(){super.onResume();if(adapter!=null)adapter.enableReaderMode(this,this,NfcAdapter.FLAG_READER_NFC_A|NfcAdapter.FLAG_READER_NFC_B|NfcAdapter.FLAG_READER_NFC_F|NfcAdapter.FLAG_READER_NFC_V|NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK,null);}
+ @Override protected void onPause(){if(adapter!=null)adapter.disableReaderMode(this);super.onPause();}
+ @Override public void onTagDiscovered(Tag tag){currentTag=tag;Ndef n=Ndef.get(tag);String text="Tag id: "+hex(tag.getId())+"\nTech: "+Arrays.toString(tag.getTechList());if(n!=null){try{n.connect();NdefMessage m=n.getNdefMessage();if(m!=null)text+="\nNDEF:\n"+describe(m);n.close();}catch(Exception e){text+="\nRead error: "+e.getMessage();}}else text+="\nNot an NDEF tag";String out=text;runOnUiThread(()->status.setText(out));}
+ private String describe(NdefMessage m){StringBuilder b=new StringBuilder();for(NdefRecord r:m.getRecords()){if(r.getTnf()==NdefRecord.TNF_WELL_KNOWN&&Arrays.equals(r.getType(),NdefRecord.RTD_TEXT)){byte[] p=r.getPayload();int lang=p.length==0?0:(p[0]&0x3f);if(p.length>1+lang)b.append("Text: ").append(new String(p,1+lang,p.length-1-lang,StandardCharsets.UTF_8));}else if(r.toUri()!=null)b.append("URI: ").append(r.toUri());else b.append("Record TNF=").append(r.getTnf());b.append('\n');}return b.toString();}
+ private void writeDemo(){Tag tag=currentTag;if(tag==null){status.setText("Discover a writable NDEF tag first");return;}new Thread(()->{Ndef n=Ndef.get(tag);String result;if(n==null)result="Tag is not NDEF-writable";else try{n.connect();if(!n.isWritable())result="Tag is read-only";else{NdefMessage m=new NdefMessage(new NdefRecord[]{NdefRecord.createTextRecord("en","Hello from Android NFC lab")});if(m.toByteArray().length>n.getMaxSize())result="Message exceeds tag capacity";else{n.writeNdefMessage(m);result="NDEF text written successfully";}}n.close();}catch(Exception e){result="Write error: "+e.getMessage();}String r=result;runOnUiThread(()->status.setText(r));}).start();}
+ static String hex(byte[] data){StringBuilder b=new StringBuilder();for(byte x:data)b.append(String.format("%02X",x));return b.toString();}
+}

@@ -1,0 +1,1 @@
+package dev.rodrigo.nfclab; import org.junit.Test; import static org.junit.Assert.*; public class SmokeTest{@Test public void hexWorks(){assertEquals("000FFF",MainActivity.hex(new byte[]{0,15,(byte)255}));}}
